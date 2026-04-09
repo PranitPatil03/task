@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Billing Data Cleaner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f3f5;
+      color: #212529;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1971c2, #1098ad);
+      color: #fff;
+      padding: 28px 40px;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header p  { margin-top: 6px; opacity: .85; font-size: .95rem; }
+
+    /* ── Layout ─────────────────────────────────── */
+    main { max-width: 1100px; margin: 36px auto; padding: 0 24px; }
+
+    /* ── Upload card ─────────────────────────────── */
+    .upload-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 36px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      margin-bottom: 32px;
+    }
+    .upload-card h2 { font-size: 1.1rem; margin-bottom: 20px; color: #343a40; }
+
+    .drop-zone {
+      border: 2.5px dashed #ced4da;
+      border-radius: 10px;
+      padding: 48px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: #f8f9fa;
+    }
+    .drop-zone.drag-over {
+      border-color: #1971c2;
+      background: #e7f5ff;
+    }
+    .drop-zone svg { width: 48px; height: 48px; color: #adb5bd; margin-bottom: 12px; }
+    .drop-zone p   { color: #868e96; font-size: .95rem; }
+    .drop-zone p span { color: #1971c2; font-weight: 600; cursor: pointer; }
+    .drop-zone .file-name {
+      margin-top: 12px;
+      font-weight: 600;
+      color: #2f9e44;
+      font-size: .95rem;
+    }
+
+    #file-input { display: none; }
+
+    .btn-upload {
+      margin-top: 20px;
+      width: 100%;
+      padding: 14px;
+      background: #1971c2;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-upload:hover:not(:disabled) { background: #1864ab; }
+    .btn-upload:disabled { background: #adb5bd; cursor: not-allowed; }
+
+    /* ── Spinner ────────────────────────────────── */
+    .spinner {
+      display: none;
+      margin: 24px auto;
+      width: 40px; height: 40px;
+      border: 4px solid #dee2e6;
+      border-top-color: #1971c2;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stats row ───────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+      text-align: center;
+    }
+    .stat-card .number { font-size: 2.2rem; font-weight: 700; }
+    .stat-card .label  { font-size: .82rem; color: #868e96; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+    .stat-total  .number { color: #1971c2; }
+    .stat-clean  .number { color: #2f9e44; }
+    .stat-flagged .number { color: #e03131; }
+
+    /* ── Results section ─────────────────────────── */
+    .results-section { display: none; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .tab-btn {
+      padding: 10px 22px;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #fff;
+      color: #495057;
+      transition: all .15s;
+    }
+    .tab-btn.active-clean   { border-color: #2f9e44; color: #2f9e44; background: #ebfbee; }
+    .tab-btn.active-flagged { border-color: #e03131; color: #e03131; background: #fff5f5; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Table ───────────────────────────────────── */
+    .table-wrap {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    thead th {
+      background: #f1f3f5;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #868e96;
+      border-bottom: 1px solid #dee2e6;
+    }
+    tbody tr:hover { background: #f8f9fa; }
+    tbody td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f3f5;
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+    .badge-row  { background: #e9ecef; color: #495057; }
+    .badge-clean  { background: #ebfbee; color: #2f9e44; }
+
+    /* ── Flagged cards ───────────────────────────── */
+    .flagged-list { display: flex; flex-direction: column; gap: 14px; }
+
+    .flagged-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+      border-left: 4px solid #e03131;
+      padding: 18px 22px;
+    }
+    .flagged-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .flagged-card-header strong { font-size: .95rem; }
+    .issue-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .issue-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: .88rem;
+    }
+    .issue-field {
+      background: #ffe3e3;
+      color: #c92a2a;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+      font-size: .8rem;
+    }
+    .issue-reason { color: #495057; }
+    .raw-values {
+      background: #f8f9fa;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: .82rem;
+      color: #868e96;
+    }
+    .raw-values span { color: #495057; }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #adb5bd;
+    }
+    .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; }
+
+    /* ── Error banner ────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: #fff5f5;
+      border: 1.5px solid #ffa8a8;
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: #c92a2a;
+      margin-bottom: 20px;
+      font-size: .9rem;
+    }
+
+    /* ── Unmapped warning ─────────────────────────── */
+    .unmapped-banner {
+      display: none;
+      background: #fff9db;
+      border: 1.5px solid #ffe066;
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: #e67700;
+      margin-bottom: 20px;
+      font-size: .9rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Billing Data Cleaner</h1>
+  <p>Upload a Excel file and get clean and flagged rows instantly</p>
+</header>
+
+<main>
+
+  <!-- Upload card -->
+  <div class="upload-card">
+    <h2>Upload Billing Export</h2>
+
+    <div class="drop-zone" id="drop-zone">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p>Drag & drop your <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong> file here</p>
+      <p>or <span onclick="document.getElementById('file-input').click()">browse to choose a file</span></p>
+      <div class="file-name" id="file-name"></div>
+    </div>
+
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" />
+
+    <div class="error-banner" id="error-banner"></div>
+
+    <button class="btn-upload" id="upload-btn" disabled>
+      Upload &amp; Process
+    </button>
+
+    <div class="spinner" id="spinner"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="results-section">
+
+    <div class="unmapped-banner" id="unmapped-banner"></div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card stat-total">
+        <div class="number" id="stat-total">0</div>
+        <div class="label">Total Rows</div>
+      </div>
+      <div class="stat-card stat-clean">
+        <div class="number" id="stat-clean">0</div>
+        <div class="label">Clean Rows</div>
+      </div>
+      <div class="stat-card stat-flagged">
+        <div class="number" id="stat-flagged">0</div>
+        <div class="label">Flagged Rows</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active-clean" id="tab-clean"   onclick="switchTab('clean')">
+        ✓ Clean Rows (<span id="tab-clean-count">0</span>)
+      </button>
+      <button class="tab-btn" id="tab-flagged" onclick="switchTab('flagged')">
+        ✗ Flagged Rows (<span id="tab-flagged-count">0</span>)
+      </button>
+    </div>
+
+    <!-- Clean rows table -->
+    <div class="tab-panel active" id="panel-clean">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Row #</th>
+              <th>Customer Name</th>
+              <th>Phone</th>
+              <th>Purchase Date</th>
+              <th>Amount (₹)</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="clean-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Flagged rows cards -->
+    <div class="tab-panel" id="panel-flagged">
+      <div class="flagged-list" id="flagged-list"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const uploadBtn  = document.getElementById('upload-btn');
+  const fileNameEl = document.getElementById('file-name');
+  const spinner    = document.getElementById('spinner');
+  const errorBanner   = document.getElementById('error-banner');
+  const unmappedBanner = document.getElementById('unmapped-banner');
+  const resultsSection = document.getElementById('results-section');
+
+  let selectedFile = null;
+
+  // ── File selection ───────────────────────────────────────────────
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+  });
+
+  function selectFile(file) {
+    selectedFile = file;
+    fileNameEl.textContent = `Selected: ${file.name}  (${(file.size / 1024).toFixed(1)} KB)`;
+    uploadBtn.disabled = false;
+    hideError();
+  }
+
+  // ── Upload ───────────────────────────────────────────────────────
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    hideError();
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Upload failed');
+        return;
+      }
+
+      renderResults(data);
+    } catch (err) {
+      showError('Network error — is the server running?');
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  // ── Render results ────────────────────────────────────────────────
+  function renderResults(data) {
+    // Stats
+    document.getElementById('stat-total').textContent   = data.total_rows;
+    document.getElementById('stat-clean').textContent   = data.clean_rows.length;
+    document.getElementById('stat-flagged').textContent = data.flagged_rows.length;
+    document.getElementById('tab-clean-count').textContent   = data.clean_rows.length;
+    document.getElementById('tab-flagged-count').textContent = data.flagged_rows.length;
+
+    // Unmapped headers warning
+    if (data.unmapped_headers && data.unmapped_headers.length > 0) {
+      unmappedBanner.style.display = 'block';
+      unmappedBanner.textContent =
+        `⚠ ${data.unmapped_headers.length} column(s) had no alias in the DB and were ignored: ${data.unmapped_headers.join(', ')}`;
+    } else {
+      unmappedBanner.style.display = 'none';
+    }
+
+    // Clean rows table
+    const tbody = document.getElementById('clean-tbody');
+    tbody.innerHTML = '';
+    if (data.clean_rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">
+        <div class="empty-state">No clean rows found</div>
+      </td></tr>`;
+    } else {
+      data.clean_rows.forEach(row => {
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="badge badge-row">Row ${row.rowNumber}</span></td>
+            <td><strong>${esc(row.customer_name)}</strong></td>
+            <td>${esc(row.phone)}</td>
+            <td>${esc(row.last_purchase_date)}</td>
+            <td>₹${Number(row.amount).toLocaleString('en-IN')}</td>
+            <td><span class="badge badge-clean">${esc(row.category)}</span></td>
+          </tr>`;
+      });
+    }
+
+    // Flagged rows cards
+    const flaggedList = document.getElementById('flagged-list');
+    flaggedList.innerHTML = '';
+    if (data.flagged_rows.length === 0) {
+      flaggedList.innerHTML = `<div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p>All rows passed validation!</p>
+      </div>`;
+    } else {
+      data.flagged_rows.forEach(row => {
+        const issuesHtml = row.issues.map(issue => `
+          <div class="issue-item">
+            <span class="issue-field">${esc(issue.field)}</span>
+            <span class="issue-reason">${esc(issue.reason)}</span>
+          </div>`).join('');
+
+        const raw = row.raw;
+        const rawHtml = Object.entries(raw)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => `<b>${k}:</b> <span>${esc(String(v))}</span>`)
+          .join('  ·  ');
+
+        flaggedList.innerHTML += `
+          <div class="flagged-card">
+            <div class="flagged-card-header">
+              <span class="badge badge-row">Row ${row.rowNumber}</span>
+              <strong>${esc(raw.customer_name || '(no name)')}</strong>
+              <span style="color:#e03131;font-size:.82rem">${row.issues.length} issue(s)</span>
+            </div>
+            <div class="issue-list">${issuesHtml}</div>
+            <div class="raw-values">${rawHtml}</div>
+          </div>`;
+      });
+    }
+
+    resultsSection.style.display = 'block';
+    // Default to flagged tab if there are flagged rows, else clean
+    switchTab(data.flagged_rows.length > 0 ? 'flagged' : 'clean');
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Tab switching ─────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.getElementById('panel-clean').classList.toggle('active', tab === 'clean');
+    document.getElementById('panel-flagged').classList.toggle('active', tab === 'flagged');
+    document.getElementById('tab-clean').className   = 'tab-btn' + (tab === 'clean'   ? ' active-clean'   : '');
+    document.getElementById('tab-flagged').className = 'tab-btn' + (tab === 'flagged' ? ' active-flagged' : '');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function setLoading(on) {
+    spinner.style.display  = on ? 'block' : 'none';
+    uploadBtn.disabled     = on;
+    uploadBtn.textContent  = on ? 'Processing…' : 'Upload & Process';
+  }
+
+  function showError(msg) {
+    errorBanner.style.display = 'block';
+    errorBanner.textContent   = '✗  ' + msg;
+  }
+
+  function hideError() {
+    errorBanner.style.display = 'none';
+  }
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
