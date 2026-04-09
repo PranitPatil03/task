@@ -1,4 +1,4 @@
-# Billing Data Cleaner
+# Billing data cleaner api
 
 A Node.js REST API that accepts messy Excel/CSV billing exports (from Busy, Tally, or any accounting software), resolves inconsistent column headers via a PostgreSQL alias table, validates every row, and returns clean and flagged records as structured JSON.
 
@@ -132,7 +132,7 @@ Server starts at `http://localhost:3000`. Open it in a browser for the upload UI
 ### 5. Test with curl
 
 ```bash
-curl -X POST http://localhost:3000/api/upload \
+curl -X POST https://mytask-api.up.railway.app/api/upload \
   -F "file=@data/billing.xlsx" | jq
 ```
 
